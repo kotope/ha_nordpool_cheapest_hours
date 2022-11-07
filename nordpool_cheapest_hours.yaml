@@ -1,25 +1,24 @@
-# Templated sensor to calculate cheapest hours
 sensor:
   - platform: template
     sensors:
       cheapest_hours_energy_tomorrow:
         device_class: timestamp
         friendly_name: Cheapest sequential electricity hours
-# Example configuration calculates three cheapest hours for the full next day (starting at 00:00 and ending 24 hours later at 00:00)
-# CHANGE-ME: numberOfSequentialHours = Number of sequential cheapest hours we are looking for
-# CHANGE-ME: lasthour = Final hour to do the calculation to (please note it's start of final hour e.g. 23:00-24:00)
-# CHANGe-ME: firstHour = First hour to do the calculation from
+        # Example configuration calculates three cheapest hours for the full next day (starting at 00:00 and ending 24 hours later at 00:00)
+        # CHANGE-ME: numberOfSequentialHours = Number of sequential cheapest hours we are looking for
+        # CHANGE-ME: lasthour = Final hour to do the calculation to (please note it's start of final hour e.g. 23:00-24:00)
+        # CHANGE-ME: firstHour = First hour to do the calculation from
         value_template: >
           {%- set numberOfSequentialHours = 3 -%}
           {%- set lastHour = 23 -%}
           {%- set firstHour = 0 -%}
-# CHANGE-ME: change entity to your own sensor: sensor.nordpool_kwh_fi_eur_3_10_024
+          # CHANGE-ME: change entity to your own sensor: sensor.nordpool_kwh_fi_eur_3_10_024
           {%- if state_attr('sensor.nordpool_kwh_fi_eur_3_10_024', 'tomorrow_valid') == true -%}
             {%- set ns = namespace(counter=0, list=[], cheapestHour=today_at("00:00") + timedelta( hours = (24)), cheapestPrice=999.00) -%}
             {%- for i in range(firstHour + numberOfSequentialHours, lastHour+1) -%}
               {%- set ns.counter = 0.0 -%}
               {%- for j in range(i-numberOfSequentialHours, i) -%}
-# CHANGE-ME: change entity to your own sensor: sensor.nordpool_kwh_fi_eur_3_10_024
+                # CHANGE-ME: change entity to your own sensor: sensor.nordpool_kwh_fi_eur_3_10_024
                 {%- set ns.counter = ns.counter + state_attr('sensor.nordpool_kwh_fi_eur_3_10_024', 'tomorrow')[j] -%}
               {%- endfor -%}
               {%- set ns.list = ns.list + [ns.counter] -%}
@@ -65,14 +64,14 @@ automation:
         entity_id: input_datetime.device_start_time
     - service: input_datetime.set_datetime
       data:
-# CHANGE-ME: 3 (3600*3) is the number of sequential cheapest hours we are looking for
+        # CHANGE-ME: 3 (3600*3) is the number of sequential cheapest hours we are looking for
         time: '{{ ((as_timestamp(states(''sensor.cheapest_hours_energy_tomorrow'')) + (3600*3)) | timestamp_custom(''%H:%M'')) }}'
       target:
         entity_id: input_datetime.device_end_time
     mode: single
 
-# CHANGE-ME: Do anything you like when the start / Stop triggers hit..
-# Start the device for cheapest hours
+  # CHANGE-ME: Do anything you like when the start / Stop triggers hit..
+  # Start the device for cheapest hours
   - id: '1663399614858'
     alias: Turn on device for cheapest hours
     description: ''
@@ -84,7 +83,7 @@ automation:
     - service: input_boolean.turn_on
       entity_id: input_boolean.cheap_electricity_simulated_switch
     mode: single
-# Stop the device after cheapest hours
+  # Stop the device after cheapest hours
   - id: '1663399614818'
     alias: Turn off device after cheapest hours
     description: ''
