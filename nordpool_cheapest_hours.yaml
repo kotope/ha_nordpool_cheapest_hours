@@ -8,17 +8,16 @@ sensor:
         # CHANGE-ME: numberOfSequentialHours = Number of sequential cheapest hours we are looking for
         # CHANGE-ME: lasthour = Final hour to do the calculation to (please note it's start of final hour e.g. 23:00-24:00)
         # CHANGE-ME: firstHour = First hour to do the calculation from
+        # CHANGE-ME: change entity to your own sensor in the block below (TWO ENTRIES): sensor.nordpool_kwh_fi_eur_3_10_024
         value_template: >
           {%- set numberOfSequentialHours = 3 -%}
           {%- set lastHour = 23 -%}
           {%- set firstHour = 0 -%}
-          # CHANGE-ME: change entity to your own sensor: sensor.nordpool_kwh_fi_eur_3_10_024
           {%- if state_attr('sensor.nordpool_kwh_fi_eur_3_10_024', 'tomorrow_valid') == true -%}
             {%- set ns = namespace(counter=0, list=[], cheapestHour=today_at("00:00") + timedelta( hours = (24)), cheapestPrice=999.00) -%}
             {%- for i in range(firstHour + numberOfSequentialHours, lastHour+1) -%}
               {%- set ns.counter = 0.0 -%}
               {%- for j in range(i-numberOfSequentialHours, i) -%}
-                # CHANGE-ME: change entity to your own sensor: sensor.nordpool_kwh_fi_eur_3_10_024
                 {%- set ns.counter = ns.counter + state_attr('sensor.nordpool_kwh_fi_eur_3_10_024', 'tomorrow')[j] -%}
               {%- endfor -%}
               {%- set ns.list = ns.list + [ns.counter] -%}
