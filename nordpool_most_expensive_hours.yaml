@@ -27,7 +27,7 @@ sensor:
                 {%- set ns.counter = ns.counter + state_attr('sensor.nordpool_kwh_se3_sek_3_10_025', 'tomorrow')[j] -%}
               {%- endfor -%}
               {%- set ns.list = ns.list + [ns.counter] -%}
-              {%- if ns.counter < ns.expensivePrice -%}
+              {%- if ns.counter > ns.expensivePrice -%}
                 {%- set ns.expensivePrice = ns.counter -%}
                 {%- set ns.expensiveHour = today_at("00:00") + timedelta( hours = (24 + i - numberOfSequentialHours)) -%}
               {%- endif -%}
