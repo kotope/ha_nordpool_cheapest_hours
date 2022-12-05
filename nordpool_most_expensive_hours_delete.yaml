@@ -4,19 +4,13 @@ sensor:
       expensive_hours_energy_tomorrow:
         device_class: timestamp
         friendly_name: expensive sequential electricity hours
-        # Example configuration calculates eight expensive hours for the full next day (starting at 00:00 and ending 24 hours later at 00:00)
-        # This can be used to allow automations to work as normal, but block them from running during the most expensive hours of the day
-        # by adding the before and after time limitations as conditions, i.e.
-        #   - condition: time
-        #       before: input_datetime.device_start_time
-        #       after: input_datetime.device_end_time
-        # ---
+        # Example configuration calculates three expensive hours for the full next day (starting at 00:00 and ending 24 hours later at 00:00)
         # CHANGE-ME: numberOfSequentialHours = Number of sequential expensive hours we are looking for
         # CHANGE-ME: lasthour = Final hour to do the calculation to (please note it's start of final hour e.g. 23:00-24:00)
         # CHANGE-ME: firstHour = First hour to do the calculation from
         # CHANGE-ME: change entity to your own sensor in the block below (TWO ENTRIES): sensor.nordpool_kwh_fi_eur_3_10_024
         value_template: >
-          {%- set numberOfSequentialHours = 8 -%}
+          {%- set numberOfSequentialHours = 3 -%}
           {%- set lastHour = 23 -%}
           {%- set firstHour = 0 -%}
           {%- if state_attr('sensor.nordpool_kwh_se3_sek_3_10_025', 'tomorrow_valid') == true -%}
@@ -53,7 +47,7 @@ automation:
     description: ''
     trigger:
     - platform: time
-      at: '23:15:00'
+      at: '14:45:00'
     condition:
     - condition: not
       conditions:
@@ -68,8 +62,8 @@ automation:
         entity_id: input_datetime.device_exp_start_time
     - service: input_datetime.set_datetime
       data:
-        # CHANGE-ME: 8 (3600*8) is the number of sequential expensive hours we are looking for
-        time: '{{ ((as_timestamp(states(''sensor.expensive_hours_energy_tomorrow'')) + (3600*8)) | timestamp_custom(''%H:%M'')) }}'
+        # CHANGE-ME: 3 (3600*3) is the number of sequential expensive hours we are looking for
+        time: '{{ ((as_timestamp(states(''sensor.expensive_hours_energy_tomorrow'')) + (3600*3)) | timestamp_custom(''%H:%M'')) }}'
       target:
         entity_id: input_datetime.device_exp_end_time
   # CHANGE-ME: Do anything you like when the start / Stop triggers hit..
