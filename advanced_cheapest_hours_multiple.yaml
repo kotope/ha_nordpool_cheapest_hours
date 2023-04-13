@@ -85,7 +85,7 @@ template:
           number_of_sequential_hours: 7 # Amount of sequantial cheapest hours in search
           first_hour: 00 # Search starting hour
           last_hour: 23 # Search ending hour
-          starting_today: true # Is the first_hour today (true / false). If false, first_hour needs to be before last_hour.
+          starting_today: false # Is the first_hour today (true / false). If false, first_hour needs to be before last_hour.
           sensor: sensor.nordpool_kwh_fi_eur_3_10_01 # Nord pool sensor id. Check it ouf from your integrations page!
           fail_safe_starting: '00:00' # If nordpool fetch fails, starting time to make the calendar entry
 
