@@ -165,8 +165,8 @@ automation:
       hours: /1
     condition:
     - condition: template
+      # from which sensor we should try the tomorrow price validation
       value_template: >
-        # from which sensor we should try the tomorrow price validation
         {%- set sensorId = 'sensor.cheapest_hours_energy_water_boiler' -%}
         {{ state_attr((state_attr(sensorId, 'sensor') | string), 'tomorrow_valid') == true }}
     - condition: state
