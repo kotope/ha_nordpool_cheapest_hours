@@ -49,7 +49,7 @@ template:
   -  sensor:
       # The actual cheapest hour sensor. If multiple entries are required, copy and set unique_id and configure attributes.
       - name: "Cheapest hours energy (Car Charging)"
-        unique_id: chepest_hours_energy_car_charging
+        unique_id: cheapest_hours_energy_car_charging
         device_class: timestamp
         state: >
           {%- set sensor = (this.attributes.get('sensor', 'sensor.nordpool_kwh_fi_eur_3_10_01') | string) -%}
