@@ -106,10 +106,10 @@ automation:
       data:
         start_date_time: >
           {%- set sensorId = 'sensor.cheapest_hours_energy' -%}
-          {{ as_timestamp(states(sensorId)) | timestamp_local }}
+          {{ as_timestamp(states(sensorId), 0) | timestamp_local }}
         end_date_time: >
           {%- set sensorId = 'sensor.cheapest_hours_energy' -%}
-          {{ (as_timestamp(states(sensorId)) + (3600 * state_attr(sensorId, 'number_of_sequential_hours') | float)) | timestamp_local }}
+          {{ (as_timestamp(states(sensorId), 0) + (3600 * state_attr(sensorId, 'number_of_sequential_hours') | float)) | timestamp_local }}
         summary: >
           {%- set sensorId = 'sensor.cheapest_hours_energy' -%}
           {{ state_attr(sensorId, 'friendly_name') | string }}
@@ -139,10 +139,10 @@ automation:
       data:
         start_date_time: >
           {%- set sensorId = 'sensor.cheapest_hours_energy' -%}
-          {{ as_timestamp(today_at(state_attr(sensorId, 'fail_safe_starting')) + timedelta( hours = 24 )) | timestamp_local }}
+          {{ as_timestamp(today_at(state_attr(sensorId, 'fail_safe_starting')) + timedelta( hours = 24 ), 0) | timestamp_local }}
         end_date_time: >
           {%- set sensorId = 'sensor.cheapest_hours_energy' -%}
-          {{ (as_timestamp(today_at(state_attr(sensorId, 'fail_safe_starting')) + timedelta( hours = 24 )) + (3600 * state_attr(sensorId, 'number_of_sequential_hours') | float)) | timestamp_local }}
+          {{ (as_timestamp(today_at(state_attr(sensorId, 'fail_safe_starting')) + timedelta( hours = 24 ), 0) + (3600 * state_attr(sensorId, 'number_of_sequential_hours') | float)) | timestamp_local }}
         summary: >
           {%- set sensorId = 'sensor.cheapest_hours_energy' -%}
           {{ state_attr(sensorId, 'friendly_name') | string }}
