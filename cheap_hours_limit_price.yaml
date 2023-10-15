@@ -1,0 +1,159 @@
+# Package to create and handle cheap hours from nord pool integration. 
+# Creates calendar events when the price drops below configured priec point
+# For more details check out the blog post at https://www.creatingsmarthome.com/?p=2182
+
+template:
+  - sensor:
+      - name: "Cheap hours energy"
+        unique_id: cheap_hours_energy
+        state: >
+          {%- set sensor = (this.attributes.get('sensor', 'sensor.nordpool') | string) -%}
+          {{ state_attr(sensor, 'tomorrow_valid') }}
+        attributes: # CHANGE-ME: Configurations..
+          price_limit: 2 # price limit
+          sensor: sensor.nordpool # Nord pool sensor id. Check it ouf from your integrations page!
+          grace_period: 5 # last hour of day grace period in minutes
+          list: >-
+            {%- set sensor = (this.attributes.get('sensor', 'sensor.nordpool_kwh_fi_eur_3_10_024') | string) -%}
+            {%- set graceperiod = (this.attributes.get('grace_period', 5) | int) -%}
+            {%- set arr = state_attr(sensor, 'tomorrow') -%}
+            {%- set now = today_at("00:00") -%}
+            {%- set pricelimit = (this.attributes.get('price_limit', 5) | float) -%}
+            {%- set ns = namespace(data=[],result=[], loopResult=[], res=[], loop=0) -%}
+            {%- if state_attr(sensor, 'tomorrow_valid') == true -%}
+              {%- for i in range(0, arr|length|default(0)) -%}
+                {%- set start = (today_at("00:00") + timedelta( hours = 24 + i)) | as_timestamp -%}
+                {%- if i+1 == arr | length -%}
+                  {%- set end = (today_at("00:00") + timedelta( hours = 24 + i + 1) - timedelta( minutes = graceperiod)) | as_timestamp -%}
+                {%- else -%}
+                  {%- set end = (today_at("00:00") + timedelta( hours = 24 + i + 1)) | as_timestamp -%}
+                {%- endif -%}
+                {%- set value = arr[i] -%}
+                {%- set ns.data = ns.data + [{'start':(start | timestamp_local), 'end': (end | timestamp_local), 'price': value}] -%}
+              {%- endfor -%}
+              {%- set ns.result = ns.data | selectattr('price', 'lessthan', pricelimit) | list -%}
+              {%- set ns.loopResult = ns.result -%}
+              {% for i in range(0, 24) %}
+                {%- set ns.loop = 0 -%}
+                {%- for i in range(ns.loopResult| length) -%}
+                  {% if i < ns.loop %}
+                    {%- continue -%}
+                  {% endif %}
+                  {%- if ns.loop+1 < (ns.loopResult | length) -%}
+                    {%- if ns.loopResult[ns.loop].end == ns.loopResult[ns.loop+1].start -%}
+                      {%- set d = {'start': (ns.loopResult[ns.loop].start), 'end': (ns.loopResult[ns.loop+1].end) } -%}
+                      {%- set ns.loop = ns.loop + 1 -%}
+                      {%- set ns.res = ns.res + [d] -%}
+                    {%- else -%}
+                      {%- set d = {'start': (ns.loopResult[ns.loop].start), 'end': (ns.loopResult[ns.loop].end) } -%}
+                      {%- set ns.res = ns.res + [d] -%}
+                    {%- endif -%}
+                  {%- else -%}
+                    {%- set d = {'start': (ns.loopResult[ns.loop].start), 'end': (ns.loopResult[ns.loop].end) } -%}
+                    {%- set ns.res = ns.res + [d] -%}
+                  {%- endif -%}
+                  {%- set ns.loop = ns.loop + 1 -%}
+                {%- endfor -%}
+                {%- if ns.loopResult | count == ns.res | count -%}
+                  {%- break -%}
+                {%- endif -%}
+                {%- set ns.loopResult = ns.res -%}
+                {%- set ns.res = [] -%}
+                {%- set ns.loop = 0 -%}
+              {% endfor %}
+              {{ ns.loopResult }}
+            {%- else -%}
+              {{ [] }}
+            {%- endif -%}
+
+# Automation to trigger for the calendar entry
+automation:
+  - id: 'Energy: Cheap hours schedule entry'
+    alias: 'Cheap hours: Calendar trigger'
+    description: ''
+    trigger:
+    - platform: calendar
+      event: start
+      entity_id: calendar.electricity
+    - platform: calendar
+      event: end
+      entity_id: calendar.electricity
+    condition:
+    - condition: template
+      value_template: >
+        {{ "Cheap Hours" in trigger.calendar_event.summary }}
+    action:
+    - if:
+      - condition: template
+        value_template: '{{ trigger.event == ''start'' }}'
+      then:
+      # CHANGE-ME: Actions to do when cheap hour starts
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.test_switch
+      else:
+      # CHANGE-ME: Actions to do when cheap hour ends
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.test_switch
+    mode: single
+
+# Automation that triggers creationg of the calendar entries
+  - id: 'cheap_hours_set_sequence'
+    alias: 'Cheap hours: Set next cheap hours'
+    description: 'Checks tomorrow energy prices every hour and create calendar entry when available AND events not yet created'
+    trigger:
+    - platform: time_pattern
+      hours: /1
+    condition:
+    - condition: template
+      # from which sensor we should try the tomorrow price validation
+      value_template: >-
+        {%- set sensorId = 'sensor.cheap_hours_energy' -%}
+        {{ state_attr(state_attr('sensor.cheap_hours_energy', 'sensor' ), 'tomorrow_valid') == true }}
+    - condition: state
+      entity_id: input_boolean.cheap_hours_set
+      state: 'off'
+    action:
+    - service: input_boolean.turn_on
+      data: {}
+      target:
+        entity_id: input_boolean.cheap_hours_set
+    - service: script.cheap_hours_create_multi_calendar
+      data:
+        sensorId: "sensor.cheap_hours_energy"
+  - id: 'cheap_hours_clear_set_flag'
+    alias: 'Cheap hours: Reset the set cheap hours helper for the next day'
+    description: 'Clears cheap hours helper boolean when the day changes.'
+    trigger:
+    - platform: time
+      at: '01:15:00'
+    condition: []
+    action:
+    - service: input_boolean.turn_off
+      data: {}
+      target:
+        entity_id: input_boolean.cheap_hours_set
+    mode: single
+
+# Helper to see if we've already created next day entries
+input_boolean:
+  cheap_hours_set:
+    name: Cheap hours set for the next day
+    icon: mdi:clock
+
+script:
+# Script that creates the calendar entries from sensor
+  cheap_hours_create_multi_calendar:
+    sequence:
+      - repeat:
+          count: "{{ state_attr(sensorId, 'list') | count }}"
+          sequence:
+            - service: calendar.create_event
+              data:
+                start_date_time: >
+                  {{ state_attr(sensorId, 'list')[repeat.index-1].start | as_timestamp | timestamp_local }}
+                end_date_time: >
+                  {{ state_attr(sensorId, 'list')[repeat.index-1].end | as_timestamp | timestamp_local }}
+                summary: >
+                  Cheap Hours
+              target:
+                entity_id: calendar.electricity
