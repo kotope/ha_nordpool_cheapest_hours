@@ -1,0 +1,212 @@
+# This is the non-sequential version of cheapest hours automation using local calendar for time schedules
+# Read more at https://www.creatingsmarthome.com/?p=2543
+template:
+  -  sensor:
+      # The actual cheapest hour sensor. If multiple entries are required, copy, raname, set unique_id and configure attributes.
+      - name: "Cheapest hours energy (non-sequential)"
+        unique_id: cheapest_hours_energy_non_sequential
+        state: >
+          {%- set sensor = (this.attributes.get('sensor', 'sensor.nordpool_kwh_fi_eur_3_10_024') | string) -%}
+          {{ state_attr(sensor, 'tomorrow_valid') }}
+        attributes:
+          # CHANGE-ME: Set your personal configurations in here
+          number_of_hours: 4 # Amount of cheapest hours in search
+          first_hour: 21 # Search starting hour
+          last_hour: 08 # Search ending hour
+          starting_today: true # Is the first_hour today (true / false). If false, first_hour needs to be before last_hour.
+          sensor: sensor.nordpool_kwh_fi_eur_3_10_024 # Nord pool sensor id. Check it ouf from your integrations page!
+          fail_safe_starting: '00:00' # If nordpool fetch fails, starting time to make the calendar entry
+          list: >-
+            {%- set sensor = (this.attributes.get('sensor', 'sensor.nordpool_kwh_fi_eur_3_10_024') | string) -%}
+            {%- set numberOfHours = (this.attributes.get('number_of_hours',1) | int) -%}
+            {%- set lastHour = (this.attributes.get('last_hour',23) | int) -%}
+            {%- set firstHour = (this.attributes.get('first_hour', 0) | int) -%}
+            {%- set startingToday = (this.attributes.get('starting_today', false) | bool) -%}
+            {%- set ns = namespace(data=[], loopResult=[], res=[], loop=0) -%}
+            {%- if state_attr(sensor, 'tomorrow_valid') == true -%}
+              {%- if startingToday == true -%}{%- set ns.starting = firstHour -%}{%- else -%}{%- set ns.starting = firstHour + 24 -%}{%- endif -%}
+              {%- set ns.ending = lastHour + 24 -%}
+
+              {%- set arr = state_attr(sensor, 'today') + state_attr(sensor, 'tomorrow') -%}
+              {%- for i in range(ns.starting, ns.ending) -%}
+               {%- set start = (today_at("00:00") + timedelta( hours = i)) -%}
+               {%- set end = (today_at("00:00") + timedelta( hours = i+1)) -%}
+               {%- set ns.data = ns.data + [{
+                 "start" : (start | as_timestamp | timestamp_local),
+                 "end" : (end | as_timestamp | timestamp_local),
+                 "price" : arr[i]}
+               ] -%}
+              {%- endfor -%}
+              {%- set ns.data = (ns.data | sort(attribute='price'))[:numberOfHours] | sort(attribute='start') -%}
+              {%- set ns.loopResult = ns.data -%}
+              {% for i in range(0, 48) %}
+                {%- set ns.loop = 0 -%}
+                {%- for i in range(ns.loopResult| length) -%}
+                  {% if i < ns.loop %}
+                    {%- continue -%}
+                  {% endif %}
+                  {%- if ns.loop+1 < (ns.loopResult | length) -%}
+                    {%- if ns.loopResult[ns.loop].end == ns.loopResult[ns.loop+1].start -%}
+                      {%- set d = {'start': (ns.loopResult[ns.loop].start), 'end': (ns.loopResult[ns.loop+1].end) } -%}
+                      {%- set ns.loop = ns.loop + 1 -%}
+                      {%- set ns.res = ns.res + [d] -%}
+                    {%- else -%}
+                      {%- set d = {'start': (ns.loopResult[ns.loop].start), 'end': (ns.loopResult[ns.loop].end) } -%}
+                      {%- set ns.res = ns.res + [d] -%}
+                    {%- endif -%}
+                  {%- else -%}
+                    {%- set d = {'start': (ns.loopResult[ns.loop].start), 'end': (ns.loopResult[ns.loop].end) } -%}
+                    {%- set ns.res = ns.res + [d] -%}
+                  {%- endif -%}
+                  {%- set ns.loop = ns.loop + 1 -%}
+                {%- endfor -%}
+                {%- if ns.loopResult | count == ns.res | count -%}
+                  {%- break -%}
+                {%- endif -%}
+                {%- set ns.loopResult = ns.res -%}
+                {%- set ns.res = [] -%}
+                {%- set ns.loop = 0 -%}
+              {% endfor %}
+              {{ ns.loopResult }}
+            {%- else -%}
+              {{ [] }}
+            {%- endif -%}
+          failsafe: >-
+            {%- set numberOfHours = (this.attributes.get('number_of_hours',1) | int) -%}
+            {%- set start = (this.attributes.get('fail_safe_starting', '00:00') | string) -%}
+            {%- set startTime = (today_at(start) + timedelta( hours = 24)) -%}
+            {%- set endTime = (today_at(start) + timedelta( hours = 24 + numberOfHours)) -%}
+            {%- set res =
+              {'start': (startTime | as_timestamp | timestamp_local),
+               'end': (endTime | as_timestamp | timestamp_local) }
+            -%}
+            [{{ res }}]
+
+automation:
+  - id: 'cheapest_hours_non_sequential_calendar_trigger'
+    alias: 'Cheapest hours: Calendar trigger (non-sequential)'
+    description: ''
+    trigger:
+    - platform: calendar
+      event: start
+      entity_id: calendar.electricity
+    - platform: calendar
+      event: end
+      entity_id: calendar.electricity
+    condition:
+    - condition: template
+      # CHANGE-ME: sensorId to used template
+      value_template: >
+        {%- set sensorId = 'sensor.cheapest_hours_energy_non_sequential' -%}
+        {{ (state_attr(sensorId, 'friendly_name') | string) in trigger.calendar_event.summary }}
+    action:
+    - if:
+      - condition: template
+        value_template: '{{ trigger.event == ''start'' }}'
+      then:
+      # CHANGE-ME: Actions to do when cheap hour starts
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.test_switch
+      else:
+      # CHANGE-ME: Actions to do when cheap hour ends
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.test_switch
+    mode: single
+
+# Automation that triggers creating of the calendar entries
+  - id: 'cheapest_hours_non_sequential_set_sequence'
+    alias: 'Cheap hours: Set next non-sequantial chepeast hours'
+    description: 'Checks tomorrow energy prices every hour and create calendar entry when available AND events not yet created'
+    variables:
+      # from which sensor we should try the tomorrow price validation
+      # CHANGE-ME: sensorId to used template
+      sensorId: >-
+        {%- set sensorId = 'sensor.cheapest_hours_energy_non_sequential' -%}
+        {{ sensorId }}
+    trigger:
+    - platform: time_pattern
+      hours: /1
+    condition:
+    - condition: template
+      value_template: >-
+        {{ state_attr(state_attr(sensorId, 'sensor' ), 'tomorrow_valid') == true }}
+    - condition: state
+      entity_id: input_boolean.cheapest_hours_non_sequential_set
+      state: 'off'
+    action:
+    - service: input_boolean.turn_on
+      data: {}
+      target:
+        entity_id: input_boolean.cheapest_hours_non_sequential_set
+    - service: script.cheapest_hours_create_multi_calendar
+      data:
+        sensorId: "{{ sensorId }}"
+        attribute: "list"
+        summary: "{{ (state_attr(sensorId, 'friendly_name') | string) }}"
+
+  # Failsafe
+  - id: 'cheapest_hours_non_sequential_failsafe'
+    alias: 'Cheapest hours: Failsafe for non-sequential'
+    description: 'Failsafe: Set cheapest hours from fail_safe value to amount of hours'
+    variables:
+      # from which sensor we should use for failsafe
+      # CHANGE-ME: sensorId to used template
+      sensorId: >-
+        {%- set sensorId = 'sensor.cheapest_hours_energy_non_sequential' -%}
+        {{ sensorId }}
+    trigger:
+    - platform: time
+      at: '23:15'
+    condition:
+    - condition: state
+      entity_id: input_boolean.cheapest_hours_non_sequential_set
+      state: 'off'
+    action:
+    - service: input_boolean.turn_on
+      data: {}
+      target:
+        entity_id: input_boolean.cheapest_hours_non_sequential_set
+    - service: script.cheapest_hours_create_multi_calendar
+      data:
+        sensorId: "{{ sensorId }}"
+        attribute: "failsafe"
+        summary: "{{ (state_attr(sensorId, 'friendly_name') | string) }}"
+
+# Clear calendar entry creation flag on new day
+  - id: 'cheapest_hours_non_sequential_clear_set_flag'
+    alias: 'Cheapest hours: Reset the set cheapest hours non-sequential helper for the next day'
+    description: 'Clears cheapest hours helper boolean when the day changes.'
+    trigger:
+    - platform: time
+      at: '01:15:00'
+    condition: []
+    action:
+    - service: input_boolean.turn_off
+      data: {}
+      target:
+        entity_id: input_boolean.cheapest_hours_non_sequential_set
+    mode: single
+
+# Helper to see if we've already created next day entries
+input_boolean:
+  cheapest_hours_non_sequential_set:
+    name: Non-sequential cheapest hours set for the next day
+    icon: mdi:clock
+
+script:
+# Script that creates the calendar entries from sensor
+  cheapest_hours_create_multi_calendar:
+    sequence:
+      - repeat:
+          count: "{{ state_attr(sensorId, attribute) | count }}"
+          sequence:
+            - service: calendar.create_event
+              data:
+                start_date_time: >
+                  {{ state_attr(sensorId, attribute)[repeat.index-1].start | as_timestamp | timestamp_local }}
+                end_date_time: >
+                  {{ state_attr(sensorId, attribute)[repeat.index-1].end | as_timestamp | timestamp_local }}
+                summary: >-
+                  {{ summary }}
+              target:
+                entity_id: calendar.electricity
