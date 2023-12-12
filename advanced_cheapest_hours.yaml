@@ -64,7 +64,7 @@ automation:
     - condition: template
       value_template: >
         {%- set sensorId = 'sensor.cheapest_hours_energy' -%}
-        {{ (state_attr(sensorId, 'friendly_name') | string) in trigger.calendar_event.summary }}
+        {{ (state_attr(sensorId, 'friendly_name') | string) == trigger.calendar_event.summary }}
     action:
     - if:
       - condition: template
