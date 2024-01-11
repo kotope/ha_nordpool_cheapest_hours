@@ -1,0 +1,140 @@
+# Package to create and handle the most expensive sequental hours from nord pool integration!
+# This is the SINGLE entry version.
+# For more details check out the blog post at https://www.creatingsmarthome.com/?p=1620
+
+template:
+  -  sensor:
+      # The actual expensive hours sensor. If multiple entries are required, copy and set unique_id and configure attributes.
+      - name: "Expensive hours energy"
+        unique_id: expensive_hours_energy
+        device_class: timestamp
+        state: >
+          {%- set sensor = (this.attributes.get('sensor', 'sensor.nordpool_kwh_fi_eur_3_10_01') | string) -%}
+          {%- set numberOfSequentialHours = (this.attributes.get('number_of_sequential_hours',1) | int) -%}
+          {%- set lastHour = (this.attributes.get('last_hour',23) | int) -%}
+          {%- set firstHour = (this.attributes.get('first_hour', 0) | int) -%}
+          {%- set startingToday = (this.attributes.get('starting_today', false) | bool) -%}
+          {%- if state_attr(sensor, 'tomorrow_valid') == true -%}
+            {%- set arr = state_attr(sensor, 'today') + state_attr(sensor, 'tomorrow') -%}
+            {%- set ns = namespace(counter=0, list=[], expensiveHour=today_at("00:00"), expensivePrice=-999) -%}
+            {%- if startingToday == true -%}
+              {%- set ns.starting = firstHour -%}
+            {%- else -%}
+              {%- set ns.starting = firstHour + 24 -%}
+            {%- endif -%}
+              {%- set ns.ending = lastHour + 24 -%}
+            {%- for i in range(ns.starting + numberOfSequentialHours, ns.ending+1) -%}
+              {%- set ns.counter = 0.0 -%}
+              {%- for j in range(i-numberOfSequentialHours, i) -%}
+                {%- set ns.counter = ns.counter + arr[j] -%}
+              {%- endfor -%}
+              {%- set ns.list = ns.list + [ns.counter] -%}
+              {%- if ns.counter > ns.expensivePrice -%}
+                {%- set ns.expensivePrice = ns.counter -%}
+                {%- set ns.expensiveHour = today_at("00:00") + timedelta( hours = (i - numberOfSequentialHours)) -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {{ ns.expensiveHour }}
+            {%- set ns.expensivePrice = ns.expensivePrice / numberOfSequentialHours -%}
+          {%- endif -%}
+        attributes:
+          # CHANGE-ME: Set your personal configurations in here
+          number_of_sequential_hours: 5 # Amount of sequantial expensive hours in search
+          first_hour: 22 # Search starting hour
+          last_hour: 08 # Search ending hour
+          starting_today: true # Is the first_hour today (true / false). If false, first_hour needs to be before last_hour.
+          sensor: sensor.nordpool_kwh_fi_eur_3_10_01 # Nord pool sensor id. Check it ouf from your integrations page!
+
+
+automation:
+  # Automation to trigger when calendar event hits the expensive hour mark
+  # start/stop automation
+  - id: 'expensive_hours_most_expensive_calendar_entry'
+    alias: 'Expensive hours: Most expensive calendar trigger'
+    description: ''
+    trigger:
+    - platform: calendar
+      event: start
+      entity_id: calendar.electricity
+    - platform: calendar
+      event: end
+      entity_id: calendar.electricity
+    condition:
+    - condition: template
+      value_template: >
+        {%- set sensorId = 'sensor.expensive_hours_energy' -%}
+        {{ (state_attr(sensorId, 'friendly_name') | string) == trigger.calendar_event.summary }}
+    action:
+    - if:
+      - condition: template
+        value_template: '{{ trigger.event == ''start'' }}'
+      then:
+      # CHANGE-ME: Actions to do when expensive hours starts
+      - service: light.turn_off
+        entity_id: light.office_work
+      else:
+      # CHANGE-ME: Actions to do when expensive hours ends
+      - service: light.turn_on
+        entity_id: light.office_work
+    mode: single
+
+  # -- GLOBAL CONFIGURATIONS BELOW, NO NEED TO CHANGE UNLESS CREATING MULTIPLE SEQUENCES --
+  # Create calendar event
+  - id: 'expensive_hours_set_sequence'
+    alias: 'Expensive hours: Set next expensive sequence'
+    description: 'Checks tomorrow energy prices every hour and create calendar entry when available AND events not yet created'
+    trigger:
+    - platform: time_pattern
+      hours: /1
+    condition:
+    - condition: template
+      # from which sensor we should try the tomorrow price validation
+      value_template: >
+        {%- set sensorId = 'sensor.expensive_hours_energy' -%}
+        {{ state_attr((state_attr(sensorId, 'sensor') | string), 'tomorrow_valid') == true }}
+    - condition: state
+      entity_id: input_boolean.expensive_hours_set
+      state: 'off'
+    action:
+    - service: input_boolean.turn_on
+      data: {}
+      target:
+        entity_id: input_boolean.expensive_hours_set
+    # Event creation
+    - service: calendar.create_event
+      data:
+        start_date_time: >
+          {%- set sensorId = 'sensor.expensive_hours_energy' -%}
+          {{ as_timestamp(states(sensorId), 0) | timestamp_local }}
+        end_date_time: >
+          {%- set sensorId = 'sensor.expensive_hours_energy' -%}
+          {{ (as_timestamp(states(sensorId), 0) + (3600 * state_attr(sensorId, 'number_of_sequential_hours') | float)) | timestamp_local }}
+        summary: >
+          {%- set sensorId = 'sensor.expensive_hours_energy' -%}
+          {{ state_attr(sensorId, 'friendly_name') | string }}
+      target:
+        entity_id: calendar.electricity
+    # If multiple expensive hours sequences are required, copy 'calendar.create_event' block from aboce and change the 'sensorId' variabes values to match corresponding new expensive hours templated sensor
+    mode: single
+
+  # input_boolean reset
+  - id: 'expensive_hours_clear_set_flag'
+    alias: 'Expensive hours: Reset the set helper for the next day'
+    description: 'Clears expensive hours helper boolean when the day changes.'
+    trigger:
+    - platform: time
+      at: '01:15:00'
+    condition: []
+    action:
+    - service: input_boolean.turn_off
+      data: {}
+      target:
+        entity_id: input_boolean.expensive_hours_set
+    mode: single
+
+# We need a helper to know if the calendar mark(s) has already been set!
+input_boolean:
+  expensive_hours_set:
+    name: Expensive hours set for the next day
+    icon: mdi:clock
+
