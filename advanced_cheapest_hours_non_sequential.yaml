@@ -210,3 +210,4 @@ script:
                   {{ summary }}
               target:
                 entity_id: calendar.electricity
+        mode: parallel
