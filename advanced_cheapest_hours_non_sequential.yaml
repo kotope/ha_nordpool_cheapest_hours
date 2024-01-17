@@ -196,6 +196,7 @@ input_boolean:
 script:
 # Script that creates the calendar entries from sensor
   cheapest_hours_create_multi_calendar:
+    mode: parallel
     sequence:
       - repeat:
           count: "{{ state_attr(sensorId, attribute) | count }}"
@@ -210,4 +211,3 @@ script:
                   {{ summary }}
               target:
                 entity_id: calendar.electricity
-        mode: parallel
