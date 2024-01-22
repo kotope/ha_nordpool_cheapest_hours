@@ -22,7 +22,7 @@ template:
             {%- else -%}
               {%- set ns.starting = firstHour + 24 -%}
             {%- endif -%}
-              {%- set ns.ending = lastHour + 24 -%}
+              {%- set ns.ending = lastHour + 24 + 1 -%}
             {%- for i in range(ns.starting + numberOfSequentialHours, ns.ending+1) -%}
               {%- set ns.counter = 0.0 -%}
               {%- for j in range(i-numberOfSequentialHours, i) -%}
@@ -65,7 +65,7 @@ template:
             {%- else -%}
               {%- set ns.starting = firstHour + 24 -%}
             {%- endif -%}
-              {%- set ns.ending = lastHour + 24 -%}
+              {%- set ns.ending = lastHour + 24 + 1 -%}
             {%- for i in range(ns.starting + numberOfSequentialHours, ns.ending+1) -%}
               {%- set ns.counter = 0.0 -%}
               {%- for j in range(i-numberOfSequentialHours, i) -%}

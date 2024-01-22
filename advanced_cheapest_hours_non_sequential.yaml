@@ -25,7 +25,7 @@ template:
             {%- set ns = namespace(data=[], loopResult=[], res=[], loop=0) -%}
             {%- if state_attr(sensor, 'tomorrow_valid') == true -%}
               {%- if startingToday == true -%}{%- set ns.starting = firstHour -%}{%- else -%}{%- set ns.starting = firstHour + 24 -%}{%- endif -%}
-              {%- set ns.ending = lastHour + 24 -%}
+              {%- set ns.ending = lastHour + 24 + 1 -%}
 
               {%- set arr = state_attr(sensor, 'today') + state_attr(sensor, 'tomorrow') -%}
               {%- for i in range(ns.starting, ns.ending) -%}
