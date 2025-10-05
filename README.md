@@ -1,3 +1,8 @@
+❗This repository is not maintaned anymore and most probably will not work with Nord Pool 15min MTU
+
+Consider moving to a new AIO Energy Management: https://github.com/kotope/aio_energy_management
+******
+
 
 ## Nordpool chepeast hours automation package for Home Assistant.
   
